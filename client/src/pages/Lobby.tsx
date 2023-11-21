@@ -1,4 +1,6 @@
-import * as React from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import {useCallback,useState,useEffect} from "react";
+import {useNavigate} from 'react-router-dom'
 
 import { Button } from "@/components/ui/button";
 import {
@@ -18,38 +20,69 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useSocket } from '@/context/SocketContext';
+
 
 function Lobby() {
+  const socket = useSocket()
+  const navigate = useNavigate();
   // State to manage form values
-  const [formValues, setFormValues] = React.useState({
+  const [formValues, setFormValues] = useState({
     email: "",
     roomId: "",
     framework: "",
   });
 
   // Event handler for form submission
-  const handleJoinButtonClick = () => {
-    // Log form values to the console
-    console.log("Form values:", formValues);
-  };
+  const handleJoinButtonClick = useCallback(
+    () => {
+      // console.log("Form values:", formValues)
+      socket.emit('room:join',formValues)
+    },
+    [formValues],
+  );
+  
 
   // Event handler for input changes
-  const handleInputChange = (e) => {
-    const { id, value } = e.target;
+  const handleInputChange = useCallback(
+    (e: any) => {
+      const { id, value } = e.target;
 
-    setFormValues((prevValues) => ({
-      ...prevValues,
-      [id]: value,
-    }));
-  };
+      setFormValues((prevValues) => ({
+        ...prevValues,
+        [id]: value,
+      }));
+    },
+    [setFormValues],
+  );
 
   // Event handler for dropdown changes
-  const handleDropdownChange = (value) => {
+  const handleDropdownChange = useCallback((value: string) => {
     setFormValues((prevValues) => ({
       ...prevValues,
       framework: value,
     }));
-  };
+  }, [setFormValues]);
+
+  const handleRoomJoin = useCallback(
+    (data: any) => {
+      const {roomId,email,framework} = data
+      console.log("In room:join \n",data);
+      // redirect to the Room
+      navigate(`/room/${roomId}`);
+    },
+    [navigate],
+  )
+  
+
+  useEffect(() => {
+    socket?.on('room:join',handleRoomJoin)
+  
+    return () => {
+      socket?.off('room:join', handleRoomJoin)
+    }
+  }, [handleRoomJoin, socket])
+  
 
   return (
     <div className='self-center'>

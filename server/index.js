@@ -21,6 +21,18 @@ const io = new Server(server, {
 
 io.on("connection", (socket) => {
   console.log(`User Connected: ${socket.id}`);
+
+  socket.on('room:join', (data) => {
+    const { roomId, email } = data;
+    console.log(data);
+    // send a msg that someone has joined a room
+    io.to(roomId).emit('user:joined', { email, id: socket.id })
+    socket.join(roomId)
+
+    // send back the data received to all the users
+    io.to(socket.id).emit('room:join', data)
+  })
+
 });
 
 server.listen(PORT, () => {
