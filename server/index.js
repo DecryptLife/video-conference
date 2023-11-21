@@ -1,13 +1,28 @@
+require('dotenv').config();
 const express = require("express");
 const app = express();
 const http = require("http");
+const { Server } = require("socket.io");
+const cors = require("cors");
 
-// when a user logs in use password hashing: never store plain-text password. A library that could be used to do this - bcrypt
+const PORT = process.env.PORT || 3000
+const CLIENT_URL = process.env.CLIENT_URL
 
-// implement rate limiting on login attemps to prevent brute force attempts
+app.use(cors());
 
-// after successful login - generate token and send it back to the user (JWT), store token on client side securely - HTTP only cookies to prevent XSS attacks
+const server = http.createServer(app);
 
-app.listen(3000, () => {
-  console.log("Server listening on 3000");
+const io = new Server(server, {
+  cors: {
+    origin: CLIENT_URL,
+    methods: ["GET", "POST"],
+  },
+});
+
+io.on("connection", (socket) => {
+  console.log(`User Connected: ${socket.id}`);
+});
+
+server.listen(PORT, () => {
+  console.log(`Server running on ${PORT}`);
 });
