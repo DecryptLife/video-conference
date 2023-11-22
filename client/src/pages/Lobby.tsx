@@ -39,7 +39,7 @@ function Lobby() {
       // console.log("Form values:", formValues)
       socket.emit('room:join',formValues)
     },
-    [formValues],
+    [formValues, socket],
   );
   
 
