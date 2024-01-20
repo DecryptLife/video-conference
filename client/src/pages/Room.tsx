@@ -3,7 +3,9 @@ import ReactPlayer from 'react-player';
 import { Button } from '@/components/ui/button';
 import { useSocket } from '@/context/SocketContext';
 import peer from '@/services/peer';
-import {Socket} from 'socket.io-client'
+import { Socket } from 'socket.io-client'
+import { FaMicrophone } from "react-icons/fa";
+
 interface UserData {
   email: string;
   id: string;
@@ -23,6 +25,8 @@ const Room: React.FC = () => {
   const [remoteSocketId, setRemoteSocketId] = useState<string>("");
   const [myStream, setMyStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [isVideo, setIsVideo] = useState<boolean>(false);
+  const [isMicrophone, setIsMicrophone] = useState<boolean>(false);
 
   const socket: Socket | null = useSocket();
 
@@ -133,9 +137,26 @@ const Room: React.FC = () => {
     };
   }, [handleIncommingCall, handleUserJoin, handleCallAccepted, socket, handleNegoNeedIncomming, handleNegoNeedFinal]);
 
+  useEffect(() => {
+    const getMediaStream = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: true,
+        });
+        setMyStream(stream);
+      } catch (error) {
+        // Handle errors, e.g., display an error message or log the error
+        console.error('Error accessing media devices:', error);
+      }
+    };
+
+    getMediaStream();
+  }, []); // Empty dependency array to ensure the effect runs only once when the component mounts
+
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-4">Room Page</h1>
+    <div className="container">
+       <h1 className="text-3xl font-bold mb-4">Room Page</h1>
 
       { remoteSocketId ? (
         <>
@@ -146,12 +167,15 @@ const Room: React.FC = () => {
         <h4 className="text-xl">No one in the room</h4>
       ) }
 
-      { myStream && <Button onClick={ sendStreams }>Send Stream</Button> }
-      <div className="flex mt-4 justify-center">
+      { myStream && <Button onClick={ sendStreams }>Send Stream</Button> } 
+      <div className="flex m-2 justify-center h-full">
         { myStream && (
           <div className="w-full sm:w-1/2 lg:w-1/2 xl:w-1/2">
             <h1 className="text-2xl font-bold mb-2">My Stream</h1>
-            <ReactPlayer playing muted url={ myStream } width="100%" height="100%" />
+            {isVideo?<ReactPlayer playing={ isVideo } muted={isMicrophone} url={ myStream } width="100%" height="100%" />: <div style={{width:"100%",height:"40vh", backgroundColor: 'black'}}></div>}
+            <Button onClick={ () => setIsVideo(!isVideo) }>Video</Button>
+            <FaMicrophone color="white" fontSize="2em" className="bg-red-500 p-1 rounded-sm	" />
+            <Button onClick={ ()=>setIsMicrophone(!isMicrophone) }>Microphone</Button>
           </div>
         ) }
         { remoteStream && (

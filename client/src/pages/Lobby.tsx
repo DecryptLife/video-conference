@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {useCallback,useState,useEffect} from "react";
 import {useNavigate} from 'react-router-dom'
+import '../styles/lobby.css'
 
 import { Button } from "@/components/ui/button";
 import {
@@ -85,7 +86,7 @@ function Lobby() {
   
 
   return (
-    <div className='self-center'>
+    <div className='self-center lobby-container'>
     <Card className="w-[550px]">
       <CardHeader>
         <CardTitle>Video Conference App</CardTitle>
