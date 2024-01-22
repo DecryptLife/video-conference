@@ -1,12 +1,14 @@
-require('dotenv').config();
+require("dotenv").config();
 const express = require("express");
 const app = express();
 const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
 
-const PORT = process.env.PORT || 3000
-const CLIENT_URL = process.env.CLIENT_URL
+const PORT = process.env.PORT || 3000;
+const CLIENT_URL = process.env.CLIENT_URL;
+
+console.log(CLIENT_URL);
 
 app.use(cors());
 
@@ -22,24 +24,24 @@ const io = new Server(server, {
 io.on("connection", (socket) => {
   console.log(`User Connected: ${socket.id}`);
 
-  socket.on('room:join', (data) => {
+  socket.on("room:join", (data) => {
     const { roomId, email } = data;
     console.log(data);
     // send a msg that someone has joined a room
-    io.to(roomId).emit('user:joined', { email, id: socket.id })
-    socket.join(roomId)
+    io.to(roomId).emit("user:joined", { email, id: socket.id });
+    socket.join(roomId);
 
     // send back the data received to all the users
-    io.to(socket.id).emit('room:join', data)
-  })
+    io.to(socket.id).emit("room:join", data);
+  });
 
-  socket.on('user:call', ({ to, offer }) => {
-    io.to(to).emit('incomming:call', { from: socket.id, offer })
-  })
+  socket.on("user:call", ({ to, offer }) => {
+    io.to(to).emit("incomming:call", { from: socket.id, offer });
+  });
 
-  socket.on('call:accepted', ({ to, ans }) => {
-    io.to(to).emit('call:accepted', { from: socket.id, ans })
-  })
+  socket.on("call:accepted", ({ to, ans }) => {
+    io.to(to).emit("call:accepted", { from: socket.id, ans });
+  });
 
   socket.on("peer:nego:needed", ({ to, offer }) => {
     console.log("peer:nego:needed", offer);
@@ -50,7 +52,6 @@ io.on("connection", (socket) => {
     console.log("peer:nego:done", ans);
     io.to(to).emit("peer:nego:final", { from: socket.id, ans });
   });
-
 });
 
 server.listen(PORT, () => {
