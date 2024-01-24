@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { useSocket } from "@/context/SocketContext";
 import peer from "@/services/peer";
 import { Socket } from "socket.io-client";
+import { useLocation } from "react-router-dom";
 interface UserData {
   email: string;
   id: string;
+  framework: string;
 }
 
 interface IncommingCallData {
@@ -20,13 +22,16 @@ interface CallAcceptedData {
 }
 
 const Room: React.FC = () => {
+  const location = useLocation();
+  const { framework } = location.state || {};
+
   const [remoteSocketId, setRemoteSocketId] = useState<string>("");
   const [myStream, setMyStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
   const socket: Socket | null = useSocket();
 
-  const handleUserJoin = useCallback(({ email, id }: UserData) => {
+  const handleUserJoin = useCallback(({ email, id, framework }: UserData) => {
     console.log(`User joined with email(${email}) in room!`);
     setRemoteSocketId(id);
   }, []);
@@ -141,44 +146,40 @@ const Room: React.FC = () => {
   ]);
 
   return (
-    <div className="bg-black w-full container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-4">Room Page</h1>
+    <div className="bg-stone-900 flex flex-col h-screen githubcontainer mx-auto p-4">
+      {/* !Header */}
+      <div className="flex items-center justify-center h-1/20">
+        <h1 className="text-3xl font-bold text-white mb-4">
+          Let's Talk About {framework}
+        </h1>
+      </div>
 
-      {remoteSocketId ? (
-        <>
-          <h4 className="text-xl mb-2">Connected</h4>
-          <Button onClick={handleCallUser}>Call</Button>
-        </>
-      ) : (
-        <h4 className="text-xl">No one in the room</h4>
-      )}
+      {/* Local User Video in center */}
+      <div className="flex items-center justify-center h-4/20">
+        <div className="bg-black  h-full w-1/4 "></div>
+      </div>
 
-      {myStream && <Button onClick={sendStreams}>Send Stream</Button>}
-      <div className="flex mt-4 justify-center">
-        {myStream && (
-          <div className="w-full sm:w-1/2 lg:w-1/2 xl:w-1/2">
-            <h1 className="text-2xl font-bold mb-2">My Stream</h1>
-            <ReactPlayer
-              playing
-              muted
-              url={myStream}
-              width="100%"
-              height="100%"
-            />
-          </div>
-        )}
-        {remoteStream && (
-          <div className="w-full sm:w-1/2 lg:w-1/2 xl:w-1/2">
-            <h1 className="text-2xl font-bold mb-2">Remote Stream</h1>
-            <ReactPlayer
-              playing
-              muted
-              url={remoteStream}
-              width="100%"
-              height="100%"
-            />
-          </div>
-        )}
+      {/* Remote User video in full-width height center */}
+      <div className="bg-stone-900 h-14/20">
+        <div className="bg-black h-3/4"></div>
+      </div>
+
+      {/* More options section */}
+      <div className="bg-black flex h-1/20">
+        {/* permissions */}
+        <div className="bg-black flex justify-start w-1/6">
+          <div></div>
+        </div>
+
+        {/* call features */}
+        <div className="w-4/6"></div>
+
+        {/* quit call  - exit for visitors, end for ownersool*/}
+        <div className="flex justify-end w-1/6">
+          <button className=" bg-red-800 w-1/2 font-bold text-white">
+            END
+          </button>
+        </div>
       </div>
     </div>
   );
