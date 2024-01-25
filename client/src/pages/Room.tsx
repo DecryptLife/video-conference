@@ -5,6 +5,19 @@ import { useSocket } from "@/context/SocketContext";
 import peer from "@/services/peer";
 import { Socket } from "socket.io-client";
 import { useLocation } from "react-router-dom";
+import {
+  CameraIcon,
+  MicrophoneIcon,
+  UserGroupIcon,
+} from "@heroicons/react/24/solid";
+import { ChevronUpIcon } from "@heroicons/react/16/solid";
+
+type PermissionState = "prompt" | "granted" | "denied";
+
+interface Permissions {
+  audio: PermissionState;
+  video: PermissionState;
+}
 interface UserData {
   email: string;
   id: string;
@@ -25,11 +38,41 @@ const Room: React.FC = () => {
   const location = useLocation();
   const { framework } = location.state || {};
 
+  const [permissions, setPermissions] = useState<Permissions>({
+    audio: "prompt",
+    video: "prompt",
+  });
+
   const [remoteSocketId, setRemoteSocketId] = useState<string>("");
   const [myStream, setMyStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
   const socket: Socket | null = useSocket();
+
+  useEffect(() => {
+    console.log("checking");
+    checkPermissions();
+  }, []);
+
+  const checkPermissions = async () => {
+    try {
+      const audioPermission = await navigator.permissions.query({
+        name: "microphone" as PermissionName,
+      });
+      const videoPermission = await navigator.permissions.query({
+        name: "camera" as PermissionName,
+      });
+
+      setPermissions({
+        audio: audioPermission.state as PermissionState,
+        video: videoPermission.state as PermissionState,
+      });
+
+      // listen for changes in permissions
+    } catch (error) {
+      console.error("Error checking media permissions: ", error);
+    }
+  };
 
   const handleUserJoin = useCallback(({ email, id, framework }: UserData) => {
     console.log(`User joined with email(${email}) in room!`);
@@ -42,6 +85,7 @@ const Room: React.FC = () => {
         audio: true,
         video: true,
       });
+
       const offer = await peer.getOffer();
       if (socket && remoteSocketId) {
         socket.emit("user:call", { to: remoteSocketId, offer });
@@ -69,9 +113,16 @@ const Room: React.FC = () => {
     [socket]
   );
 
+  //  merge the below two functions
   const sendStreams = useCallback(() => {
     for (const track of myStream?.getTracks() || []) {
       peer.peer.addTrack(track, myStream || undefined);
+    }
+  }, [myStream]);
+
+  const stopStreams = useCallback(() => {
+    for (const track of myStream?.getTracks() || []) {
+      track.stop();
     }
   }, [myStream]);
 
@@ -148,15 +199,25 @@ const Room: React.FC = () => {
   return (
     <div className="bg-stone-900 flex flex-col h-screen githubcontainer mx-auto p-4">
       {/* !Header */}
-      <div className="flex items-center justify-center h-1/20">
-        <h1 className="text-3xl font-bold text-white mb-4">
-          Let's Talk About {framework}
-        </h1>
+      <div className=" flex items-center  justify-between h-1/20 w-full">
+        <div className="flex-1 flex justify-center">
+          <h1 className="text-3xl font-bold text-white mb-4">
+            Let's Talk About {framework}
+          </h1>
+        </div>
+        <div className="flex items-center">
+          <span className="text-white"> Participants</span>
+          <ChevronUpIcon className="text-white h-5 w-5 "></ChevronUpIcon>
+        </div>
       </div>
 
       {/* Local User Video in center */}
       <div className="flex items-center justify-center h-4/20">
-        <div className="bg-black  h-full w-1/4 "></div>
+        <div className="bg-black  h-full w-1/4 ">
+          <div className="flex items-center justify-center h-full">
+            <span className="text-white">Local User</span>
+          </div>
+        </div>
       </div>
 
       {/* Remote User video in full-width height center */}
@@ -167,12 +228,39 @@ const Room: React.FC = () => {
       {/* More options section */}
       <div className="bg-black flex h-1/20">
         {/* permissions */}
-        <div className="bg-black flex justify-start w-1/6">
-          <div></div>
+        <div className="bg-black flex justify-evenly w-1/6 ">
+          <div className="permission-item-container ">
+            <div className="permission-item-icon">
+              <CameraIcon className=" text-white  "></CameraIcon>
+            </div>
+            <div className="permission-item-text">
+              <span className="text-white text-xs ">Camera</span>
+            </div>
+          </div>
+
+          <div className="permission-item-container">
+            <div className="permission-item-icon">
+              <MicrophoneIcon className="text-white"></MicrophoneIcon>
+            </div>
+
+            <div className="permission-item-text">
+              <span className="text-white text-xs">Audio</span>
+            </div>
+          </div>
         </div>
 
         {/* call features */}
-        <div className="w-4/6"></div>
+        <div className="flex justify-center w-4/6">
+          <div className="permission-item-container">
+            <div className="permission-item-icon">
+              <UserGroupIcon className="text-white"></UserGroupIcon>
+            </div>
+
+            <div className="permission-item-text">
+              <span className="text-white text-xs">Participants</span>
+            </div>
+          </div>
+        </div>
 
         {/* quit call  - exit for visitors, end for ownersool*/}
         <div className="flex justify-end w-1/6">
@@ -186,3 +274,5 @@ const Room: React.FC = () => {
 };
 
 export default Room;
+
+// upon removal of track inform the other user
