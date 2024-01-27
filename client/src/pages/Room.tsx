@@ -10,7 +10,7 @@ import {
   MicrophoneIcon,
   UserGroupIcon,
 } from "@heroicons/react/24/solid";
-import { ChevronUpIcon } from "@heroicons/react/16/solid";
+import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/16/solid";
 
 type PermissionState = "prompt" | "granted" | "denied";
 
@@ -38,6 +38,7 @@ const Room: React.FC = () => {
   const location = useLocation();
   const { framework } = location.state || {};
 
+  const [showParticipants, setShowParticipants] = useState(false);
   const [permissions, setPermissions] = useState<Permissions>({
     audio: "prompt",
     video: "prompt",
@@ -159,6 +160,11 @@ const Room: React.FC = () => {
     await peer.setLocalDescription(ans);
   }, []);
 
+  function changeParticipantsView() {
+    setShowParticipants((prevState) => !prevState);
+  }
+
+  const endSession = () => {};
   useEffect(() => {
     peer.peer.addEventListener("track", async (ev) => {
       const _remoteStream = ev.streams;
@@ -197,81 +203,154 @@ const Room: React.FC = () => {
   ]);
 
   return (
-    <div className="bg-stone-900 flex flex-col h-screen githubcontainer mx-auto p-4">
+    <div className="relative bg-stone-900 flex flex-col h-screen githubcontainer mx-auto p-4">
       {/* !Header */}
-      <div className=" flex items-center  justify-between h-1/20 w-full">
-        <div className="flex-1 flex justify-center">
-          <h1 className="text-3xl font-bold text-white mb-4">
-            Let's Talk About {framework}
-          </h1>
-        </div>
-        <div className="flex items-center">
-          <span className="text-white"> Participants</span>
-          <ChevronUpIcon className="text-white h-5 w-5 "></ChevronUpIcon>
-        </div>
-      </div>
+      <Header
+        framework={framework}
+        showParticipants={showParticipants}
+        changeParticipantsView={changeParticipantsView}
+      />
+      {showParticipants && <Participants />}
 
       {/* Local User Video in center */}
-      <div className="flex items-center justify-center h-4/20">
-        <div className="bg-black  h-full w-1/4 ">
-          <div className="flex items-center justify-center h-full">
-            <span className="text-white">Local User</span>
-          </div>
-        </div>
-      </div>
+      <SmallVideoScreen />
 
       {/* Remote User video in full-width height center */}
-      <div className="bg-stone-900 h-14/20">
-        <div className="bg-black h-3/4"></div>
-      </div>
-
+      <LargeScreen />
       {/* More options section */}
-      <div className="bg-black flex h-1/20">
-        {/* permissions */}
-        <div className="bg-black flex justify-evenly w-1/6 ">
-          <div className="permission-item-container ">
-            <div className="permission-item-icon">
-              <CameraIcon className=" text-white  "></CameraIcon>
+
+      <CallOptions changeParticipantsView={changeParticipantsView} />
+    </div>
+  );
+};
+
+function Header({ framework, showParticipants, changeParticipantsView }) {
+  return (
+    <div className=" flex items-center  justify-between h-1/20 w-full">
+      <div className="flex-1 flex justify-center">
+        <h1 className="text-3xl font-bold text-white mb-4">
+          Let's Talk About {framework}
+        </h1>
+      </div>
+      <div className="flex items-center">
+        <span className="text-white"> Participants</span>
+        {showParticipants ? (
+          <ChevronUpIcon
+            className="text-white h-5 w-5 "
+            onClick={changeParticipantsView}
+          />
+        ) : (
+          <ChevronDownIcon
+            className="text-white h-5 w-5"
+            onClick={changeParticipantsView}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Participants() {
+  return (
+    <div className="absolute bg-white w-1/5 h-14/20 top-5p right-0">
+      <ul className="h-full">
+        <li className="h-1/6">
+          <div className="p-2 flex h-full ">
+            <div className="w-2/5  h-2/4 flex items-center">
+              <span>Participant Name </span>
             </div>
-            <div className="permission-item-text">
-              <span className="text-white text-xs ">Camera</span>
+            <div className=" h-2/4 flex justify-evenly w-3/5 ">
+              <button className="bg-green-600 text-white w-2/5 rounded-full shadow-xl">
+                Accept
+              </button>
+              <button className="bg-red-600 text-white w-2/5 rounded-full shadow-xl">
+                Reject
+              </button>
             </div>
           </div>
+        </li>
+      </ul>
+    </div>
+  );
+}
 
-          <div className="permission-item-container">
-            <div className="permission-item-icon">
-              <MicrophoneIcon className="text-white"></MicrophoneIcon>
-            </div>
-
-            <div className="permission-item-text">
-              <span className="text-white text-xs">Audio</span>
-            </div>
-          </div>
-        </div>
-
-        {/* call features */}
-        <div className="flex justify-center w-4/6">
-          <div className="permission-item-container">
-            <div className="permission-item-icon">
-              <UserGroupIcon className="text-white"></UserGroupIcon>
-            </div>
-
-            <div className="permission-item-text">
-              <span className="text-white text-xs">Participants</span>
-            </div>
-          </div>
-        </div>
-
-        {/* quit call  - exit for visitors, end for ownersool*/}
-        <div className="flex justify-end w-1/6">
-          <button className=" bg-red-800 w-1/2 font-bold text-white">
-            END
-          </button>
+function SmallVideoScreen() {
+  return (
+    <div className="flex items-center justify-center h-4/20">
+      <div className="bg-black  h-full w-1/4 ">
+        <div className="flex items-center justify-center h-full">
+          <span className="text-white">Local User</span>
         </div>
       </div>
     </div>
   );
-};
+}
+
+function LargeScreen() {
+  return (
+    <div className="bg-stone-900 h-14/20 ">
+      <div className="bg-black h-3/4">
+        <div className="flex items-center justify-center h-full">
+          <span className="text-white">Local/Remote User</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CallOptions({ changeParticipantsView }) {
+  return (
+    <div className="bg-black flex h-1/20">
+      {/* permissions */}
+      <div className="bg-black flex justify-evenly w-1/6 ">
+        <div className="permission-item-container ">
+          <div className="permission-item-icon">
+            <CameraIcon className=" text-white  "></CameraIcon>
+          </div>
+          <div className="permission-item-text">
+            <span className="text-white text-xs ">Camera</span>
+          </div>
+        </div>
+
+        <div className="permission-item-container">
+          <div className="permission-item-icon">
+            <MicrophoneIcon className="text-white" />
+          </div>
+
+          <div className="permission-item-text">
+            <span className="text-white text-xs">Audio</span>
+          </div>
+        </div>
+      </div>
+
+      {/* call features */}
+      <div className="flex justify-center w-4/6">
+        <div className="permission-item-container">
+          <div className="permission-item-icon">
+            <UserGroupIcon
+              className="text-white"
+              onClick={changeParticipantsView}
+            ></UserGroupIcon>
+          </div>
+
+          <div className="permission-item-text">
+            <span className="text-white text-xs">Participants</span>
+          </div>
+        </div>
+      </div>
+
+      {/* quit call  - exit for visitors, end for ownersool*/}
+      <div className="flex justify-end w-1/6">
+        <button
+          className=" bg-red-800 w-1/2 font-bold text-white"
+          onClick={() => endSession()}
+        >
+          END
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default Room;
 
