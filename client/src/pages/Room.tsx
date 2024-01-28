@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useSocket } from "@/context/SocketContext";
 import peer from "@/services/peer";
 import { Socket } from "socket.io-client";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   CameraIcon,
   MicrophoneIcon,
@@ -36,13 +36,14 @@ interface CallAcceptedData {
 
 const Room: React.FC = () => {
   const location = useLocation();
-  const { framework } = location.state || {};
+  const { email, framework } = location.state || {};
+  const navigate = useNavigate();
+
+  const [audioPermission, setAudioPermission] = useState("pending");
+  const [videoPermission, setVideoPermission] = useState("pending");
+  const [mediaStream, setMediaStream] = useState(null);
 
   const [showParticipants, setShowParticipants] = useState(false);
-  const [permissions, setPermissions] = useState<Permissions>({
-    audio: "prompt",
-    video: "prompt",
-  });
 
   const [remoteSocketId, setRemoteSocketId] = useState<string>("");
   const [myStream, setMyStream] = useState<MediaStream | null>(null);
@@ -51,28 +52,54 @@ const Room: React.FC = () => {
   const socket: Socket | null = useSocket();
 
   useEffect(() => {
-    console.log("checking");
-    checkPermissions();
+    requestMedia();
   }, []);
 
-  const checkPermissions = async () => {
-    try {
-      const audioPermission = await navigator.permissions.query({
-        name: "microphone" as PermissionName,
-      });
-      const videoPermission = await navigator.permissions.query({
-        name: "camera" as PermissionName,
+  const requestMedia = async () => {
+    let audioGranted = false;
+    let videoGranted = false;
+
+    // audioPermission granted , but audio stopped
+    if (audioPermission === "denied") {
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioGranted = true;
+        setAudioPermission("granted");
+      } catch (err) {
+        console.error("Audio permission disabled");
+        setAudioPermission("denied");
+      }
+    } else audioGranted = true;
+
+    if (videoPermission === "denied") {
+      try {
+        await navigator.mediaDevices.getUserMedia({ video: true });
+        videoGranted = true;
+        setVideoPermission("granted");
+      } catch (err) {
+        console.error("Video permissions disabled");
+        setVideoPermission("denied");
+      }
+    } else videoGranted = true;
+
+    if (audioGranted || videoGranted) {
+      const stream: MediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: audioGranted,
+        video: videoGranted,
       });
 
-      setPermissions({
-        audio: audioPermission.state as PermissionState,
-        video: videoPermission.state as PermissionState,
-      });
-
-      // listen for changes in permissions
-    } catch (error) {
-      console.error("Error checking media permissions: ", error);
+      setMyStream(stream);
     }
+  };
+
+  const changeCameraState = () => {
+    // permission granted already turn off the video tracks, else request permission
+    videoPermission ? stopStreams : checkPermissions;
+  };
+
+  const changeAudioState = () => {
+    // permission granted already turn off the video tracks, else request permission
+    audioPermission ? stopStreams : checkPermissions;
   };
 
   const handleUserJoin = useCallback(({ email, id, framework }: UserData) => {
@@ -164,7 +191,9 @@ const Room: React.FC = () => {
     setShowParticipants((prevState) => !prevState);
   }
 
-  const endSession = () => {};
+  const endSession = () => {
+    navigate("/");
+  };
   useEffect(() => {
     peer.peer.addEventListener("track", async (ev) => {
       const _remoteStream = ev.streams;
@@ -213,13 +242,24 @@ const Room: React.FC = () => {
       {showParticipants && <Participants />}
 
       {/* Local User Video in center */}
-      <SmallVideoScreen />
+
+      <div className="flex items-center justify-center h-4/20">
+        {remoteStream && <SmallVideoScreen />}
+      </div>
 
       {/* Remote User video in full-width height center */}
-      <LargeScreen />
+      {myStream ? (
+        <LargeScreen username={email} />
+      ) : (
+        <LargeScreen username={email} stream={myStream} />
+      )}
       {/* More options section */}
 
-      <CallOptions changeParticipantsView={changeParticipantsView} />
+      <CallOptions
+        changeParticipantsView={changeParticipantsView}
+        endSession={endSession}
+        requestMedia={requestMedia}
+      />
     </div>
   );
 };
@@ -276,36 +316,47 @@ function Participants() {
 
 function SmallVideoScreen() {
   return (
-    <div className="flex items-center justify-center h-4/20">
-      <div className="bg-black  h-full w-1/4 ">
-        <div className="flex items-center justify-center h-full">
-          <span className="text-white">Local User</span>
-        </div>
+    <div className="bg-black  h-full w-1/4 ">
+      <div className="flex items-center justify-center h-full">
+        <span className="text-white">Local User</span>
       </div>
     </div>
   );
 }
 
-function LargeScreen() {
+function LargeScreen({ username, myStream }) {
   return (
     <div className="bg-stone-900 h-14/20 ">
       <div className="bg-black h-3/4">
-        <div className="flex items-center justify-center h-full">
-          <span className="text-white">Local/Remote User</span>
-        </div>
+        {myStream ? (
+          <ReactPlayer
+            playing
+            muted
+            url={myStream}
+            width="100%"
+            height="100%"
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <span className="text-white">{username}</span>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function CallOptions({ changeParticipantsView }) {
+function CallOptions({ changeParticipantsView, endSession, requestMedia }) {
   return (
     <div className="bg-black flex h-1/20">
       {/* permissions */}
       <div className="bg-black flex justify-evenly w-1/6 ">
         <div className="permission-item-container ">
           <div className="permission-item-icon">
-            <CameraIcon className=" text-white  "></CameraIcon>
+            <CameraIcon
+              className=" text-white  "
+              onClick={requestMedia}
+            ></CameraIcon>
           </div>
           <div className="permission-item-text">
             <span className="text-white text-xs ">Camera</span>
@@ -314,7 +365,7 @@ function CallOptions({ changeParticipantsView }) {
 
         <div className="permission-item-container">
           <div className="permission-item-icon">
-            <MicrophoneIcon className="text-white" />
+            <MicrophoneIcon className="text-white" onClick={requestMedia} />
           </div>
 
           <div className="permission-item-text">
@@ -343,7 +394,7 @@ function CallOptions({ changeParticipantsView }) {
       <div className="flex justify-end w-1/6">
         <button
           className=" bg-red-800 w-1/2 font-bold text-white"
-          onClick={() => endSession()}
+          onClick={endSession}
         >
           END
         </button>
