@@ -39,8 +39,13 @@ const Room: React.FC = () => {
   const { email, framework } = location.state || {};
   const navigate = useNavigate();
 
-  const [audioPermission, setAudioPermission] = useState("pending");
-  const [videoPermission, setVideoPermission] = useState("pending");
+  const [sendAudio, setSendAudio] = useState(false);
+  const [sendVideo, setSendVideo] = useState(false);
+
+  const [permissions, setPermissions] = useState({
+    audio: "pending",
+    video: "pending",
+  });
   const [mediaStream, setMediaStream] = useState(null);
 
   const [showParticipants, setShowParticipants] = useState(false);
@@ -60,25 +65,31 @@ const Room: React.FC = () => {
     let videoGranted = false;
 
     // audioPermission granted , but audio stopped
-    if (audioPermission === "denied") {
+    if (permissions.audio !== "granted") {
       try {
+        console.log("Asking audio permission: " + permissions.audio);
         await navigator.mediaDevices.getUserMedia({ audio: true });
         audioGranted = true;
-        setAudioPermission("granted");
+        setSendAudio(true);
+        setPermissions((prev) => ({ ...prev, audio: "granted" }));
       } catch (err) {
         console.error("Audio permission disabled");
-        setAudioPermission("denied");
+        setSendAudio(false);
+        setPermissions((prev) => ({ ...prev, audio: "denied" }));
       }
     } else audioGranted = true;
 
-    if (videoPermission === "denied") {
+    if (permissions.video !== "granted") {
       try {
+        console.log("video permissin: " + permissions.video);
         await navigator.mediaDevices.getUserMedia({ video: true });
         videoGranted = true;
-        setVideoPermission("granted");
+        setSendVideo(true);
+        setPermissions((prev) => ({ ...prev, video: "granted" }));
       } catch (err) {
         console.error("Video permissions disabled");
-        setVideoPermission("denied");
+        setSendVideo(true);
+        setPermissions((prev) => ({ ...prev, video: "denied" }));
       }
     } else videoGranted = true;
 
@@ -88,18 +99,10 @@ const Room: React.FC = () => {
         video: videoGranted,
       });
 
+      console.log(stream);
       setMyStream(stream);
+      sendStreams();
     }
-  };
-
-  const changeCameraState = () => {
-    // permission granted already turn off the video tracks, else request permission
-    videoPermission ? stopStreams : checkPermissions;
-  };
-
-  const changeAudioState = () => {
-    // permission granted already turn off the video tracks, else request permission
-    audioPermission ? stopStreams : checkPermissions;
   };
 
   const handleUserJoin = useCallback(({ email, id, framework }: UserData) => {
@@ -143,16 +146,31 @@ const Room: React.FC = () => {
 
   //  merge the below two functions
   const sendStreams = useCallback(() => {
+    console.log("sending streams");
     for (const track of myStream?.getTracks() || []) {
       peer.peer.addTrack(track, myStream || undefined);
     }
-  }, [myStream]);
+  }, [myStream, sendAudio, sendVideo]);
 
   const stopStreams = useCallback(() => {
+    console.log("Stopping streams");
     for (const track of myStream?.getTracks() || []) {
       track.stop();
     }
+    setPermissions({
+      audio: "pending",
+      video: "pending",
+    });
+    setMyStream(null);
   }, [myStream]);
+
+  const toggleAudio = () => {
+    // no stream do nothing
+    if (!myStream) return;
+
+    for (const track of myStream?.getAudioTracks() || []) {
+    }
+  };
 
   const handleCallAccepted = useCallback(
     async ({ from, ans }: CallAcceptedData) => {
@@ -192,6 +210,10 @@ const Room: React.FC = () => {
   }
 
   const endSession = () => {
+    setPermissions({
+      audio: "pending",
+      video: "pending",
+    });
     navigate("/");
   };
   useEffect(() => {
@@ -249,9 +271,9 @@ const Room: React.FC = () => {
 
       {/* Remote User video in full-width height center */}
       {myStream ? (
-        <LargeScreen username={email} />
-      ) : (
         <LargeScreen username={email} stream={myStream} />
+      ) : (
+        <LargeScreen username={email} />
       )}
       {/* More options section */}
 
@@ -324,17 +346,18 @@ function SmallVideoScreen() {
   );
 }
 
-function LargeScreen({ username, myStream }) {
+function LargeScreen({ username, stream }) {
   return (
     <div className="bg-stone-900 h-14/20 ">
-      <div className="bg-black h-3/4">
-        {myStream ? (
+      <div className="bg-black w-full h-3/4">
+        {stream ? (
           <ReactPlayer
             playing
             muted
-            url={myStream}
+            url={stream}
             width="100%"
             height="100%"
+            className="object-cover"
           />
         ) : (
           <div className="flex items-center justify-center h-full">
