@@ -80,7 +80,7 @@
 }
 
 .permission-item-container {
-  @apply flex flex-col w-full;
+  @apply flex flex-col w-full h-full;
 }
 
 .permission-item-icon {

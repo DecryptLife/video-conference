@@ -41,6 +41,7 @@ const Room: React.FC = () => {
 
   const [sendAudio, setSendAudio] = useState(false);
   const [sendVideo, setSendVideo] = useState(false);
+  const [usersInRoom, setUsersInRoom] = useState([]);
 
   const [permissions, setPermissions] = useState({
     audio: "pending",
@@ -101,16 +102,18 @@ const Room: React.FC = () => {
 
       console.log(stream);
       setMyStream(stream);
-      sendStreams();
     }
   };
 
   const handleUserJoin = useCallback(({ email, id, framework }: UserData) => {
     console.log(`User joined with email(${email}) in room!`);
     setRemoteSocketId(id);
+    setShowParticipants(true);
+    setUsersInRoom((prevUsers) => [...prevUsers, { email, id }]);
   }, []);
 
   const handleCallUser = useCallback(async () => {
+    console.log("calling user");
     try {
       const stream: MediaStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
@@ -118,7 +121,9 @@ const Room: React.FC = () => {
       });
 
       const offer = await peer.getOffer();
+      console.log("Offer created");
       if (socket && remoteSocketId) {
+        console.log("calling user");
         socket.emit("user:call", { to: remoteSocketId, offer });
       }
       setMyStream(stream);
@@ -147,31 +152,46 @@ const Room: React.FC = () => {
   //  merge the below two functions
   const sendStreams = useCallback(() => {
     console.log("sending streams");
+
     for (const track of myStream?.getTracks() || []) {
       peer.peer.addTrack(track, myStream || undefined);
     }
-  }, [myStream, sendAudio, sendVideo]);
 
-  const stopStreams = useCallback(() => {
-    console.log("Stopping streams");
-    for (const track of myStream?.getTracks() || []) {
-      track.stop();
-    }
-    setPermissions({
-      audio: "pending",
-      video: "pending",
-    });
-    setMyStream(null);
+    // clear existing tracks from peer connections
+    // peer.peer.getSenders().forEach((sender) => {
+    //   peer.peer.removeTrack(sender);
+    // });
+
+    // const track: MediaStreamTrack[] = myStream?.getTracks();
+    // if (track) {
+    //   console.log("Tracks : ", track);
+    //   track[0].enabled = sendAudio ? true : false;
+    //   track[1].enabled = sendVideo ? true : false;
+    //   peer.peer.addTrack(track, myStream || []);
+    // }
   }, [myStream]);
 
-  const toggleAudio = () => {
-    // no stream do nothing
-    if (!myStream) return;
+  function toggleAudio() {
+    setSendAudio((prev) => !prev);
+    sendStreams();
+    console.log("Audio state: ", sendAudio);
+  }
 
-    for (const track of myStream?.getAudioTracks() || []) {
-    }
-  };
+  function toggleVideo() {
+    setSendVideo((prev) => !prev);
+    sendStreams();
+    console.log("sVideo state: ", sendVideo);
+  }
 
+  const rejectJoinRequest = useCallback(
+    (userId) => {
+      setUsersInRoom((prevUser) =>
+        prevUser.filter((user) => user.id !== userId)
+      );
+      socket?.emit("room:join:reject", { to: remoteSocketId });
+    },
+    [usersInRoom]
+  );
   const handleCallAccepted = useCallback(
     async ({ from, ans }: CallAcceptedData) => {
       await peer.setLocalDescription(ans);
@@ -261,7 +281,13 @@ const Room: React.FC = () => {
         showParticipants={showParticipants}
         changeParticipantsView={changeParticipantsView}
       />
-      {showParticipants && <Participants />}
+      {showParticipants && (
+        <Participants
+          usersInRoom={usersInRoom}
+          rejectJoinRequest={rejectJoinRequest}
+          handleCallUser={handleCallUser}
+        />
+      )}
 
       {/* Local User Video in center */}
 
@@ -280,7 +306,8 @@ const Room: React.FC = () => {
       <CallOptions
         changeParticipantsView={changeParticipantsView}
         endSession={endSession}
-        requestMedia={requestMedia}
+        toggleAudio={toggleAudio}
+        toggleVideo={toggleVideo}
       />
     </div>
   );
@@ -312,25 +339,33 @@ function Header({ framework, showParticipants, changeParticipantsView }) {
   );
 }
 
-function Participants() {
+function Participants({ usersInRoom, rejectJoinRequest, handleCallUser }) {
   return (
     <div className="absolute bg-white w-1/5 h-14/20 top-5p right-0">
       <ul className="h-full">
-        <li className="h-1/6">
-          <div className="p-2 flex h-full ">
-            <div className="w-2/5  h-2/4 flex items-center">
-              <span>Participant Name </span>
+        {usersInRoom?.map((user: UserData) => (
+          <li key={user.id} className="h-1/6">
+            <div className="p-2 flex h-full ">
+              <div className="w-2/5  h-2/4 flex items-center">
+                <span>{user.email} </span>
+              </div>
+              <div className=" h-2/4 flex justify-evenly w-3/5 ">
+                <button
+                  className="bg-green-600 text-white w-2/5 rounded-full shadow-xl"
+                  onClick={handleCallUser}
+                >
+                  Accept
+                </button>
+                {/* <button
+                  className="bg-red-600 text-white w-2/5 rounded-full shadow-xl"
+                  onClick={() => rejectJoinRequest(user.id)}
+                >
+                  Reject
+                </button> */}
+              </div>
             </div>
-            <div className=" h-2/4 flex justify-evenly w-3/5 ">
-              <button className="bg-green-600 text-white w-2/5 rounded-full shadow-xl">
-                Accept
-              </button>
-              <button className="bg-red-600 text-white w-2/5 rounded-full shadow-xl">
-                Reject
-              </button>
-            </div>
-          </div>
-        </li>
+          </li>
+        ))}
       </ul>
     </div>
   );
@@ -369,7 +404,12 @@ function LargeScreen({ username, stream }) {
   );
 }
 
-function CallOptions({ changeParticipantsView, endSession, requestMedia }) {
+function CallOptions({
+  changeParticipantsView,
+  endSession,
+  toggleAudio,
+  toggleVideo,
+}) {
   return (
     <div className="bg-black flex h-1/20">
       {/* permissions */}
@@ -378,7 +418,7 @@ function CallOptions({ changeParticipantsView, endSession, requestMedia }) {
           <div className="permission-item-icon">
             <CameraIcon
               className=" text-white  "
-              onClick={requestMedia}
+              onClick={toggleVideo}
             ></CameraIcon>
           </div>
           <div className="permission-item-text">
@@ -388,7 +428,7 @@ function CallOptions({ changeParticipantsView, endSession, requestMedia }) {
 
         <div className="permission-item-container">
           <div className="permission-item-icon">
-            <MicrophoneIcon className="text-white" onClick={requestMedia} />
+            <MicrophoneIcon className="text-white" onClick={toggleAudio} />
           </div>
 
           <div className="permission-item-text">

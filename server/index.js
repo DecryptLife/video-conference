@@ -25,10 +25,10 @@ io.on("connection", (socket) => {
   console.log(`User Connected: ${socket.id}`);
 
   socket.on("room:join", (data) => {
-    const { roomId, email } = data;
+    const { roomId, email, framework } = data;
     console.log(data);
     // send a msg that someone has joined a room
-    io.to(roomId).emit("user:joined", { email, id: socket.id });
+    io.to(roomId).emit("user:joined", { email, id: socket.id, framework });
     socket.join(roomId);
 
     // send back the data received to all the users
