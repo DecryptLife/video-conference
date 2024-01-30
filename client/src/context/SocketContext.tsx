@@ -22,7 +22,7 @@ export const useSocket = () => {
 };
 
 export const SocketProvider = (props: SocketProviderProps) => {
-  const socket = useMemo(() => io("localhost:3000"), []);
+  const socket = useMemo(() => io("localhost:3002"), []);
 
   // Wrap the socket in an object to match the context type
   const contextValue: SocketContextProps = { socket };

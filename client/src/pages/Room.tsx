@@ -36,7 +36,7 @@ interface CallAcceptedData {
 
 const Room: React.FC = () => {
   const location = useLocation();
-  const { email, framework } = location.state || {};
+  const { email, framework, isRoomOwner } = location.state || {};
   const navigate = useNavigate();
 
   const [sendAudio, setSendAudio] = useState(false);
@@ -47,7 +47,6 @@ const Room: React.FC = () => {
     audio: "pending",
     video: "pending",
   });
-  const [mediaStream, setMediaStream] = useState(null);
 
   const [showParticipants, setShowParticipants] = useState(false);
 
@@ -113,7 +112,7 @@ const Room: React.FC = () => {
   }, []);
 
   const handleCallUser = useCallback(async () => {
-    console.log("calling user");
+    console.log(email + "calling user");
     try {
       const stream: MediaStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
@@ -151,8 +150,7 @@ const Room: React.FC = () => {
 
   //  merge the below two functions
   const sendStreams = useCallback(() => {
-    console.log("sending streams");
-
+    console.log("send stream clicked");
     for (const track of myStream?.getTracks() || []) {
       peer.peer.addTrack(track, myStream || undefined);
     }
@@ -202,6 +200,7 @@ const Room: React.FC = () => {
   );
 
   const handleNegoNeeded = useCallback(async () => {
+    console.log("nego needed by : ", email);
     const offer = await peer.getOffer();
     socket?.emit("peer:nego:needed", { offer, to: remoteSocketId });
   }, [remoteSocketId, socket]);
@@ -215,6 +214,7 @@ const Room: React.FC = () => {
 
   const handleNegoNeedIncomming = useCallback(
     async ({ from, offer }: IncommingCallData) => {
+      console.log("nego needed incoming");
       const ans = await peer.getAnswer(offer);
       socket?.emit("peer:nego:done", { to: from, ans });
     },
@@ -222,11 +222,16 @@ const Room: React.FC = () => {
   );
 
   const handleNegoNeedFinal = useCallback(async ({ ans }) => {
+    console.log("nego needed final");
     await peer.setLocalDescription(ans);
   }, []);
 
   function changeParticipantsView() {
     setShowParticipants((prevState) => !prevState);
+  }
+
+  function sayHello() {
+    console.log("HEllo");
   }
 
   const endSession = () => {
@@ -284,23 +289,28 @@ const Room: React.FC = () => {
       {showParticipants && (
         <Participants
           usersInRoom={usersInRoom}
-          rejectJoinRequest={rejectJoinRequest}
+          isRoomOwner={isRoomOwner}
           handleCallUser={handleCallUser}
+          remoteStream={remoteStream}
+          sendStreams={sendStreams}
         />
       )}
 
       {/* Local User Video in center */}
 
       <div className="flex items-center justify-center h-4/20">
-        {remoteStream && <SmallVideoScreen />}
+        {remoteStream && <SmallVideoScreen stream={myStream} />}
       </div>
 
       {/* Remote User video in full-width height center */}
-      {myStream ? (
-        <LargeScreen username={email} stream={myStream} />
-      ) : (
-        <LargeScreen username={email} />
-      )}
+
+      <div className="bg-stone-900 flex flex-col h-14/20 ">
+        {remoteStream ? (
+          <LargeScreen username={email} stream={remoteStream} />
+        ) : (
+          <LargeScreen username={email} stream={myStream} />
+        )}
+      </div>
       {/* More options section */}
 
       <CallOptions
@@ -339,67 +349,79 @@ function Header({ framework, showParticipants, changeParticipantsView }) {
   );
 }
 
-function Participants({ usersInRoom, rejectJoinRequest, handleCallUser }) {
+function Participants({
+  usersInRoom,
+  isRoomOwner,
+  handleCallUser,
+  remoteStream,
+  sendStreams,
+}) {
   return (
-    <div className="absolute bg-white w-1/5 h-14/20 top-5p right-0">
+    <div className="absolute flex flex-col bg-white  top-5p right-0">
       <ul className="h-full">
         {usersInRoom?.map((user: UserData) => (
           <li key={user.id} className="h-1/6">
             <div className="p-2 flex h-full ">
-              <div className="w-2/5  h-2/4 flex items-center">
-                <span>{user.email} </span>
+              <div className="  h-2/4 flex items-center">
+                <span>{user.email} in room </span>
               </div>
-              <div className=" h-2/4 flex justify-evenly w-3/5 ">
+              <div className=" h-2/4 flex justify-evenly ">
                 <button
                   className="bg-green-600 text-white w-2/5 rounded-full shadow-xl"
                   onClick={handleCallUser}
                 >
-                  Accept
+                  Call
                 </button>
-                {/* <button
-                  className="bg-red-600 text-white w-2/5 rounded-full shadow-xl"
-                  onClick={() => rejectJoinRequest(user.id)}
-                >
-                  Reject
-                </button> */}
               </div>
             </div>
           </li>
         ))}
       </ul>
+      {!isRoomOwner && remoteStream && (
+        <button className="bg-green-900 w-full z-10" onClick={sendStreams}>
+          {" "}
+          Join Room
+        </button>
+      )}
     </div>
   );
 }
 
-function SmallVideoScreen() {
+function SmallVideoScreen({ stream }) {
   return (
-    <div className="bg-black  h-full w-1/4 ">
-      <div className="flex items-center justify-center h-full">
+    <div className="bg-black h-full w-1/4 ">
+      {stream ? (
+        <ReactPlayer
+          playing
+          muted
+          url={stream}
+          width={"100"}
+          height={"100"}
+        ></ReactPlayer>
+      ) : (
         <span className="text-white">Local User</span>
-      </div>
+      )}
     </div>
   );
 }
 
 function LargeScreen({ username, stream }) {
   return (
-    <div className="bg-stone-900 h-14/20 ">
-      <div className="bg-black w-full h-3/4">
-        {stream ? (
-          <ReactPlayer
-            playing
-            muted
-            url={stream}
-            width="100%"
-            height="100%"
-            className="object-cover"
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <span className="text-white">{username}</span>
-          </div>
-        )}
-      </div>
+    <div className="bg-black w-full h-3/4">
+      {stream ? (
+        <ReactPlayer
+          playing
+          muted
+          url={stream}
+          width="100%"
+          height="100%"
+          className="object-cover"
+        />
+      ) : (
+        <div className="flex items-center justify-center h-full">
+          <span className="text-white">{username}</span>
+        </div>
+      )}
     </div>
   );
 }

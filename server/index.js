@@ -5,7 +5,7 @@ const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3002;
 const CLIENT_URL = process.env.CLIENT_URL;
 
 console.log(CLIENT_URL);
@@ -25,10 +25,14 @@ io.on("connection", (socket) => {
   console.log(`User Connected: ${socket.id}`);
 
   socket.on("room:join", (data) => {
-    const { roomId, email, framework } = data;
     console.log(data);
+    const { email, roomId, framework } = data;
     // send a msg that someone has joined a room
-    io.to(roomId).emit("user:joined", { email, id: socket.id, framework });
+    io.to(roomId).emit("user:joined", {
+      email,
+      id: socket.id,
+      framework,
+    });
     socket.join(roomId);
 
     // send back the data received to all the users
@@ -39,7 +43,7 @@ io.on("connection", (socket) => {
     io.to(to).emit("incomming:call", { from: socket.id, offer });
   });
 
-  socket.on("call:accepted", ({ to, ans }) => {
+  socket.on("call:accepted", ({ to, from, ans }) => {
     io.to(to).emit("call:accepted", { from: socket.id, ans });
   });
 

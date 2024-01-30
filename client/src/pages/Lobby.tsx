@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useSocket } from "@/context/SocketContext";
+import { resolve } from "path";
 
 function Lobby() {
   const socket = useSocket();
@@ -31,12 +32,27 @@ function Lobby() {
     email: "",
     roomId: "",
     framework: "",
+    isRoomOwner: false,
   });
 
   // Event handler for form submission
-  const handleJoinButtonClick = useCallback(() => {
-    // console.log("Form values:", formValues)
-    socket.emit("room:join", formValues);
+  const handleJoinButtonClick = useCallback(
+    (_isRoomOwner) => {
+      // console.log("Form values:", formValues)
+      if (_isRoomOwner) {
+        setFormValues((prevValues) => ({
+          ...prevValues,
+          isRoomOwner: true,
+        }));
+      } else socket.emit("room:join", formValues);
+    },
+    [formValues, socket]
+  );
+
+  useEffect(() => {
+    if (formValues.isRoomOwner) {
+      socket?.emit("room:join", formValues);
+    }
   }, [formValues, socket]);
 
   // Event handler for input changes
@@ -65,10 +81,12 @@ function Lobby() {
 
   const handleRoomJoin = useCallback(
     (data: any) => {
-      const { roomId, email, framework } = data;
+      const { roomId, email, framework, isRoomOwner } = data;
       console.log("In room:join \n", data);
       // redirect to the Room
-      navigate(`/room/${roomId}`, { state: { email, framework } });
+      navigate(`/room/${roomId}`, {
+        state: { email, framework, isRoomOwner },
+      });
     },
     [navigate]
   );
@@ -129,7 +147,11 @@ function Lobby() {
         <CardFooter className="flex justify-between">
           <Button variant="outline">Cancel</Button>
           {/* Call handleJoinButtonClick when the Join button is clicked */}
-          <Button onClick={handleJoinButtonClick}>Join</Button>
+
+          <div className="flex space-x-4">
+            <Button onClick={() => handleJoinButtonClick(true)}>Create</Button>
+            <Button onClick={() => handleJoinButtonClick(false)}>Join</Button>
+          </div>
         </CardFooter>
       </Card>
     </div>
